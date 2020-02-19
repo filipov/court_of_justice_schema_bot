@@ -1,1 +1,1 @@
-web: ./target/release/court_of_justice
+worker: ./target/release/court_of_justice
