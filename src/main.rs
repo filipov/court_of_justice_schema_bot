@@ -1,13 +1,14 @@
 use crate::loader::{get_years, get_year_page_count};
 use redis::Commands;
 use std::collections::HashMap;
+use std::env;
 
 mod http_client;
 mod loader;
 mod redis_conn;
 
 fn main() {
-    let link = "http://mos-sud.ru/services/caseinfo/caseinfocs/";
+    let link = env::var("LINK").unwrap(); //"http://mos-sud.ru/services/caseinfo/caseinfocs/";
 
     let mut redis = redis_conn::redis_connection();
 
