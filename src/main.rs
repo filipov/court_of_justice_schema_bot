@@ -8,7 +8,7 @@ mod loader;
 mod redis_conn;
 
 fn main() {
-    let link = env::var("LINK").unwrap(); //"http://mos-sud.ru/services/caseinfo/caseinfocs/";
+    let link = env::var("LINK").unwrap();
 
     let mut redis = redis_conn::redis_connection();
 
