@@ -2,10 +2,18 @@ use core::time;
 use std::thread::sleep;
 use redis::{Connection, Commands};
 use std::error::Error;
+use std::time::SystemTime;
 
 const MAX: u8 = 6;
 
 const TIMEOUT: u64 = 6000;
+
+fn timestamp() -> u128 {
+    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(n) => n.as_millis(),
+        Err(_) => 0,
+    }
+}
 
 pub struct Client<'a> {
     errors_count: u8,
@@ -90,7 +98,10 @@ impl<'a> Client<'a> {
                 {
                     let _ : () = self.redis.rpush(
                         self.link.to_owned(),
-                        status.to_string()
+                        format!(
+                            "{{ \"status\": \"{}\", \"at\": \"{}\" }}",
+                            status.to_string(), timestamp()
+                        )
                     ).unwrap();
                 }
 
