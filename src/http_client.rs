@@ -99,7 +99,7 @@ impl<'a> Client<'a> {
                     let _ : () = self.redis.rpush(
                         self.link.to_owned(),
                         format!(
-                            "{{ \"status\": \"{}\", \"at\": \"{}\" }}",
+                            "{{ \"status\": {}, \"at\": {} }}",
                             status.to_string(), timestamp()
                         )
                     ).unwrap();
