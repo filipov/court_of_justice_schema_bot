@@ -38,10 +38,13 @@ fn main() {
     for _i in 0..threads_count {
         threads.push(thread::spawn( move || {
             loop {
-                match operations::get().as_str() {
-                    "" => {}
-                    operation =>
-                        operations::execute(operation.to_string())
+                match operations::get() {
+                    Err(e) => { println!("{:?}", e); }
+                    Ok(operation) =>
+                        match operations::execute(operation) {
+                            Err(e) => { println!("{:?}", e); },
+                            Ok(_) => {}
+                        }
                 }
             }
         }));

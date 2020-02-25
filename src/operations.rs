@@ -1,9 +1,8 @@
 use redis::Commands;
 use crate::redis_conn;
-use std::error::Error;
 use std::time::SystemTime;
 use std::panic::resume_unwind;
-use std::io::ErrorKind;
+use std::io::{Error, ErrorKind};
 
 mod get_page;
 mod get_page_count;
@@ -16,7 +15,7 @@ pub fn timestamp() -> u128 {
     }
 }
 
-pub fn create(name: &str, args: &[(String, String)]) -> Result<(), Box<dyn Error>> {
+pub fn create(name: &str, args: &[(String, String)]) -> Result<(), Box<dyn std::error::Error>> {
     println!("Create {}...", &name);
 
     let mut redis = redis_conn::redis_connection();
@@ -31,21 +30,12 @@ pub fn create(name: &str, args: &[(String, String)]) -> Result<(), Box<dyn Error
 
     let _: () = redis.sadd("operations", key)?;
 
-    /////////////////////////////////////////////////////
-    // let key = format!("operation:{}", timestamp());
-    //
-    // let mut args = args.to_owned();
-    //
-    // args.push(("name".to_string(), name.to_string()));
-    //
-    // redis.hset_multiple(&key, &args)?;
-
     println!("...created {} {:?}", &name, &args);
 
     Ok(())
 }
 
-pub fn  get() -> Result<String, Box<dyn Error>> {
+pub fn  get() -> Result<String, Box<dyn std::error::Error>> {
     let mut redis = redis_conn::redis_connection();
 
     let operation: String = redis::transaction(&mut redis, &["operations"], |con, _pipe| {
@@ -54,81 +44,52 @@ pub fn  get() -> Result<String, Box<dyn Error>> {
         let operations: Vec<String> = con.srandmember_multiple("operations", count)?;
 
         for operation in operations {
-            if con.get(&operation)? != 1 {
-                con.set_ex(&operation, 1, 300);
+            let res = match con.get(&operation) {
+                Err(_) => 0,
+                Ok(r) => r
+            };
+
+            if res != 1 {
+                let _: () = con.set_ex(&operation, 1, 300)?;
 
                 return Ok(Some(operation))
             }
         }
 
-        Err(Error::new(ErrorKind::Other, "Not found operation"))
+        Ok(Some("".to_string()))
     })?;
 
-    Ok(operation)
+    if operation == "" {
+        return Err(Box::new(Error::new(ErrorKind::Other, "Not found operation")))
+    }
 
-    /////////////////////////////////////////////////////
-    // let mut keys: std::vec::Vec<String> = match redis.keys("operation:*") {
-    //     Ok(keys) => keys,
-    //     Err(e) => {
-    //         println!("{:?}", e);
-    //         Vec::new()
-    //     }
-    // };
-    //
-    // keys.sort();
-    //
-    // if keys.is_empty() {
-    //     match create("get_years", &Vec::new()) {
-    //         Ok(_) => {},
-    //         Err(e) => println!("{:?}", e)
-    //     };
-    //
-    //     return "".to_string();
-    // }
-    //
-    // match redis::transaction(&mut redis, &keys, |con, _pipe| {
-    //     let mut operation: String = "".to_string();
-    //
-    //     for key in &keys {
-    //         let used = match con.get(format!("wip:{}", key)) {
-    //             Ok(result) => result,
-    //             Err(_) => 0
-    //         };
-    //
-    //         if used == 0 {
-    //             operation = key.to_owned();
-    //
-    //             break;
-    //         }
-    //     }
-    //
-    //     if operation.is_empty() {
-    //         match create("get_years", &Vec::new()) {
-    //             Ok(_) => {},
-    //             Err(e) => println!("{:?}", e)
-    //         };
-    //     }
-    //
-    //     con.set_ex(format!("wip:{}", operation), 1, 600)?;
-    //
-    //     Ok(Some(operation))
-    // }) {
-    //     Ok(res) => res,
-    //     Err(e) => {
-    //         println!("{:?}", e);
-    //         "".to_string()
-    //     }
-    // }
+    Ok(operation)
 }
 
-pub fn execute(key: String) {
-    let (operation, values): (&str, &str) = key.split("||").collect();
+pub fn execute(key: String) -> Result<(), Box<dyn std::error::Error>> {
+    let values: Vec<&str> = key.split("||").collect();
 
-    let values: Vec<&str> = values.split("|").collect();
+    if values.len() == 0 {
+        return Err(Box::new(Error::new(ErrorKind::Other, "Nullable operation")))
+    }
 
-    let values: Vec<Vec<&str>> = values.iter().map(|&value| value.split(":")).collect();
+    let operation= values[0];
 
-    match operation.as_str() {
+    let values: Vec<&str> = {
+        if values.len() > 1 {
+            values[1].split("|").collect()
+        } else {
+            vec![""]
+        }
+    };
+
+    let values: Vec<Vec<&str>> = if values[0].is_empty() {
+        vec![vec![]]
+    } else {
+        values.iter().map(|&value| value.split(":").collect()).collect()
+    };
+
+    match operation {
         "get_years" => match get_years::execute() {
             Err(e) => println!("{:?}", e),
             _ => {}
@@ -137,7 +98,7 @@ pub fn execute(key: String) {
             let mut year = "2010";
 
             for value in values {
-                if value[0] == "year" {
+                if value.len() > 1 && value[0] == "year" {
                     year = value[1]
                 }
             }
@@ -150,8 +111,8 @@ pub fn execute(key: String) {
         "get_page" => {
             let mut page = "0";
 
-            for value in values {
-                if value[0] == "page" {
+            for value in &values {
+                if value.len() > 1 && value[0] == "page" {
                     page = value[1]
                 }
             }
@@ -159,7 +120,7 @@ pub fn execute(key: String) {
             let mut year = "2010";
 
             for value in values {
-                if value[0] == "year" {
+                if value.len() > 1 && value[0] == "year" {
                     year = value[1]
                 }
             }
@@ -174,5 +135,7 @@ pub fn execute(key: String) {
 
     let mut redis = redis_conn::redis_connection();
 
-    redis.srem("operations", key);
+    let _:() = redis.srem("operations", key)?;
+
+    Ok(())
 }
