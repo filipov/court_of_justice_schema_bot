@@ -44,7 +44,7 @@ impl<'a> Client<'a> {
             Err(e) => {
                 if self.errors_count < MAX {
                     println!("{:#?}", e);
-                    self.errors_count = self.errors_count + 1;
+                    self.errors_count += 1;
                     self.create_request()
                 } else {
                     panic!("{:#?}", e);
@@ -63,7 +63,7 @@ impl<'a> Client<'a> {
             Err(e) => {
                 if self.errors_count < MAX {
                     println!("{:#?}", e);
-                    self.errors_count = self.errors_count + 1;
+                    self.errors_count += 1;
                     sleep(time::Duration::from_millis(TIMEOUT));
                     self.execute()
                 } else {
@@ -96,13 +96,18 @@ impl<'a> Client<'a> {
 
                 // Записываем что-то где-то
                 {
-                    let _ : () = self.redis.rpush(
+                    let _: () = match self.redis.rpush(
                         self.link.to_owned(),
                         format!(
                             "{{ \"status\": {}, \"at\": {} }}",
                             status.to_string(), timestamp()
                         )
-                    ).unwrap();
+                    ) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            println!("{:?}", e);
+                        }
+                    };
                 }
 
                 sleep(time::Duration::from_millis(TIMEOUT));
