@@ -84,7 +84,7 @@ pub fn execute(number: String, path: String) -> Result<(), Box<dyn Error>> {
                                 "Дата регистрации:" => "registeredAt",
                                 "Ответчик:" => "defendant",
                                 "УИД:" => "uid",
-                                field => filed
+                                field => field
                             }.to_string();
 
                             let value = re.replace_all(&cells[1].inner_html(), "$text").trim().to_owned();
