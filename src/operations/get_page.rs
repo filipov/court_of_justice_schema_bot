@@ -19,7 +19,7 @@ pub fn execute(page: String, year: String) -> Result<(), Box<dyn Error>> {
             &mut redis
         );
 
-    let body = http.body().unwrap();
+    let body = http.body()?;
 
     let document = Html::parse_document(&body);
 
