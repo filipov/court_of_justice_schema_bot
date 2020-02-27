@@ -8,7 +8,7 @@ use crate::operations::create;
 pub fn execute() -> Result<(), Box<dyn Error>> {
     println!("Get list of years...");
 
-    let link = env::var("LINK").unwrap();
+    let link = env::var("LINK")?;
 
     let mut redis = redis_conn::redis_connection();
 
@@ -36,7 +36,7 @@ pub fn execute() -> Result<(), Box<dyn Error>> {
         create(
             "get_page_count",
             &[("year".to_string(), year.to_string())]
-        );
+        )?;
     }
 
     println!("...{}", &years.join(", "));

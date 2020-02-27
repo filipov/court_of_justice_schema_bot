@@ -54,7 +54,7 @@ pub fn execute(year: String) -> Result<(), Box<dyn Error>> {
                 ("year".to_string(), year.to_string()),
                 ("page".to_string(), page.to_string())
             ]
-        );
+        )?;
 
         sleep(time::Duration::from_millis(1));
     }

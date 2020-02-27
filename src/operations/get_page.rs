@@ -2,7 +2,6 @@ use std::error::Error;
 use crate::{redis_conn, http_client};
 use std::env;
 use scraper::{Html, Selector};
-use std::cmp::max;
 use crate::operations::create;
 use core::time;
 use std::thread::sleep;

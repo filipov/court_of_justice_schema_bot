@@ -1,19 +1,11 @@
 use redis::Commands;
 use crate::redis_conn;
-use std::time::SystemTime;
-use std::panic::resume_unwind;
 use std::io::{Error, ErrorKind};
 
+mod get_document;
 mod get_page;
 mod get_page_count;
 mod get_years;
-
-pub fn timestamp() -> u128 {
-    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(n) => n.as_millis(),
-        Err(_) => 0,
-    }
-}
 
 pub fn create(name: &str, args: &[(String, String)]) -> Result<(), Box<dyn std::error::Error>> {
     println!("Create {}...", &name);
@@ -126,6 +118,28 @@ pub fn execute(key: String) -> Result<(), Box<dyn std::error::Error>> {
             }
 
             match get_page::execute(page.to_string(), year.to_string()) {
+                Err(e) => println!("{:?}", e),
+                _ => {}
+            }
+        },
+        "get_document" => {
+            let mut number = "0";
+
+            for value in &values {
+                if value.len() > 1 && value[0] == "number" {
+                    number = value[1]
+                }
+            }
+
+            let mut link = "2010";
+
+            for value in values {
+                if value.len() > 1 && value[0] == "link" {
+                    link = value[1]
+                }
+            }
+
+            match get_document::execute(number.to_string(), link.to_string()) {
                 Err(e) => println!("{:?}", e),
                 _ => {}
             }

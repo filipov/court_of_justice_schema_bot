@@ -3,8 +3,9 @@ use std::thread::sleep;
 use redis::{Connection, Commands};
 use std::error::Error;
 use std::time::SystemTime;
-
-const MAX: u8 = 6;
+use encoding::{DecoderTrap, Encoding};
+use encoding::all::{WINDOWS_1251};
+use curl::easy::Easy;
 
 const TIMEOUT: u64 = 6000;
 
@@ -16,7 +17,6 @@ fn timestamp() -> u128 {
 }
 
 pub struct Client<'a> {
-    errors_count: u8,
     pub link: String,
     pub text: String,
 
@@ -28,7 +28,6 @@ pub struct Client<'a> {
 impl<'a> Client<'a> {
     pub fn new(link: String, redis: &'a mut Connection) -> Client {
         Client {
-            errors_count: 0,
             link,
             text: "".to_string(),
 
@@ -39,42 +38,47 @@ impl<'a> Client<'a> {
     }
 
     // Создание объекта запроса с N возможным количеством ошибок
-    fn create_request(&mut self) -> nano_get::Request {
-        match nano_get::Request::default_get_request(self.link.to_owned()) {
-            Err(e) => {
-                if self.errors_count < MAX {
-                    println!("{:#?}", e);
-                    self.errors_count += 1;
-                    self.create_request()
-                } else {
-                    panic!("{:#?}", e);
-                }
-            },
-            Ok(request) => {
-                self.errors_count = 0;
-                request
-            }
-        }
+    fn create_request(&mut self) -> curl::easy::Easy {
+        let mut easy = Easy::new();
+
+        match easy.url(&self.link) {
+            Err(e) => panic!("{:?}", e),
+            Ok(e) => e
+        };
+
+        easy
     }
 
     // Вызов запроса
-    fn execute(&mut self) -> nano_get::Response {
-        match self.create_request().execute() {
-            Err(e) => {
-                if self.errors_count < MAX {
-                    println!("{:#?}", e);
-                    self.errors_count += 1;
-                    sleep(time::Duration::from_millis(TIMEOUT));
-                    self.execute()
-                } else {
-                    panic!("{:#?}", e);
-                }
-            },
-            Ok(response) => {
-                self.errors_count = 0;
-                response
+    fn execute(&mut self) -> Result<(Vec<u8>, u32), Box<dyn Error>> {
+        let mut data = Vec::new();
+
+        let mut code = 0;
+
+        {
+            let mut easy = self.create_request();
+
+            {
+                let mut transfer = easy.transfer();
+
+                transfer.write_function(|body| {
+                    for slice in body {
+                        data.push(slice.to_owned())
+                    }
+
+                    Ok(body.len())
+                })?;
+
+                transfer.perform()?;
             }
+
+            code = match easy.response_code() {
+                Ok(code) => code,
+                Err(_) => 600
+            };
         }
+
+        Ok((data, code))
     }
 
     // Запрос тела по ссылке
@@ -85,14 +89,16 @@ impl<'a> Client<'a> {
             let mut status = 0;
 
             while status != 200 && status != 404 {
-                let resp = self.execute();
+                let result = self.execute()?;
 
-                status = match resp.get_status_code() {
-                    Some(code) => code,
-                    _ => 600
+                let data = result.0;
+
+                status = result.1;
+
+                self.text = match WINDOWS_1251.decode(&data, DecoderTrap::Replace) {
+                    Ok(r) => r,
+                    Err(e) => { println!("{:?}", e); "".to_string() }
                 };
-
-                self.text = resp.body;
 
                 // Записываем что-то где-то
                 {
